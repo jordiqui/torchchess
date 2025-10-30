@@ -254,6 +254,26 @@ void Engine::set_ponderhit(bool b) { threads.main_manager()->ponder = b; }
 void Engine::verify_networks() const {
     networks->big.verify(options["EvalFile"], onVerifyNetworks);
     networks->small.verify(options["EvalFileSmall"], onVerifyNetworks);
+
+    if (onVerifyNetworks)
+    {
+        const bool bigFallback   = networks->big.is_fallback_active();
+        const bool smallFallback = networks->small.is_fallback_active();
+
+        if (bigFallback && !smallFallback)
+        {
+            onVerifyNetworks("The primary NNUE network '" + std::string(options["EvalFile"]) +
+                             "' is unavailable; falling back to '"
+                             + std::string(options["EvalFileSmall"]) +
+                             "'. Run scripts/net.sh to download the recommended network.");
+        }
+        else if (bigFallback && smallFallback)
+        {
+            onVerifyNetworks("No NNUE networks could be loaded. The engine will use the simplified "
+                             "material evaluation. Run scripts/net.sh to download '"
+                             + std::string(options["EvalFile"]) + "' or provide valid EvalFile/EvalFileSmall paths.");
+        }
+    }
 }
 
 void Engine::load_networks() {
