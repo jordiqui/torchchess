@@ -19,6 +19,7 @@
 #include "network.h"
 
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -112,7 +113,8 @@ bool write_parameters(std::ostream& stream, T& reference) {
 template<typename Arch, typename Transformer>
 Network<Arch, Transformer>::Network(const Network<Arch, Transformer>& other) :
     evalFile(other.evalFile),
-    embeddedType(other.embeddedType) {
+    embeddedType(other.embeddedType),
+    fallbackActive(other.fallbackActive) {
 
     if (other.featureTransformer)
         featureTransformer = make_unique_large_page<Transformer>(*other.featureTransformer);
@@ -131,6 +133,7 @@ Network<Arch, Transformer>&
 Network<Arch, Transformer>::operator=(const Network<Arch, Transformer>& other) {
     evalFile     = other.evalFile;
     embeddedType = other.embeddedType;
+    fallbackActive = other.fallbackActive;
 
     if (other.featureTransformer)
         featureTransformer = make_unique_large_page<Transformer>(*other.featureTransformer);
@@ -155,6 +158,11 @@ void Network<Arch, Transformer>::load(const std::string& rootDirectory, std::str
     std::vector<std::string> dirs = {"<internal>", "", rootDirectory};
 #endif
 
+    fallbackActive = false;
+
+    const std::string requestedEvalfile =
+      evalfilePath.empty() ? evalFile.defaultName : evalfilePath;
+
     if (evalfilePath.empty())
         evalfilePath = evalFile.defaultName;
 
@@ -173,6 +181,9 @@ void Network<Arch, Transformer>::load(const std::string& rootDirectory, std::str
             }
         }
     }
+
+    if (evalFile.current != requestedEvalfile)
+        activate_fallback(requestedEvalfile);
 }
 
 
@@ -180,6 +191,13 @@ template<typename Arch, typename Transformer>
 bool Network<Arch, Transformer>::save(const std::optional<std::string>& filename) const {
     std::string actualFilename;
     std::string msg;
+
+    if (fallbackActive)
+    {
+        msg = "Fallback evaluation is active; no NNUE network parameters are available to save.";
+        sync_cout << msg << sync_endl;
+        return false;
+    }
 
     if (filename.has_value())
         actualFilename = filename.value();
@@ -212,6 +230,12 @@ NetworkOutput
 Network<Arch, Transformer>::evaluate(const Position&                         pos,
                                      AccumulatorStack&                       accumulatorStack,
                                      AccumulatorCaches::Cache<FTDimensions>* cache) const {
+
+    if (fallbackActive)
+    {
+        const Value simple = static_cast<Value>(::Stockfish::Eval::simple_eval(pos));
+        return {simple, VALUE_ZERO};
+    }
 
     constexpr uint64_t alignment = CacheLineSize;
 
@@ -259,12 +283,20 @@ void Network<Arch, Transformer>::verify(std::string                             
 
     if (f)
     {
-        size_t size = sizeof(*featureTransformer) + sizeof(Arch) * LayerStacks;
-        f("NNUE evaluation using " + evalfilePath + " (" + std::to_string(size / (1024 * 1024))
-          + "MiB, (" + std::to_string(featureTransformer->InputDimensions) + ", "
-          + std::to_string(network[0].TransformedFeatureDimensions) + ", "
-          + std::to_string(network[0].FC_0_OUTPUTS) + ", " + std::to_string(network[0].FC_1_OUTPUTS)
-          + ", 1))");
+        if (fallbackActive)
+        {
+            f("WARNING: Using simplified material evaluation because the network file '"
+              + evalfilePath + "' is unavailable.");
+        }
+        else
+        {
+            size_t size = sizeof(*featureTransformer) + sizeof(Arch) * LayerStacks;
+            f("NNUE evaluation using " + evalfilePath + " (" + std::to_string(size / (1024 * 1024))
+              + "MiB, (" + std::to_string(featureTransformer->InputDimensions) + ", "
+              + std::to_string(network[0].TransformedFeatureDimensions) + ", "
+              + std::to_string(network[0].FC_0_OUTPUTS) + ", " + std::to_string(network[0].FC_1_OUTPUTS)
+              + ", 1))");
+        }
     }
 }
 
@@ -274,6 +306,21 @@ NnueEvalTrace
 Network<Arch, Transformer>::trace_evaluate(const Position&                         pos,
                                            AccumulatorStack&                       accumulatorStack,
                                            AccumulatorCaches::Cache<FTDimensions>* cache) const {
+
+    if (fallbackActive)
+    {
+        NnueEvalTrace trace{};
+        const Value   simple = static_cast<Value>(::Stockfish::Eval::simple_eval(pos));
+        trace.correctBucket  = 0;
+
+        for (IndexType bucket = 0; bucket < LayerStacks; ++bucket)
+        {
+            trace.psqt[bucket]       = simple;
+            trace.positional[bucket] = VALUE_ZERO;
+        }
+
+        return trace;
+    }
 
     constexpr uint64_t alignment = CacheLineSize;
 
@@ -308,6 +355,7 @@ void Network<Arch, Transformer>::load_user_net(const std::string& dir,
     {
         evalFile.current        = evalfilePath;
         evalFile.netDescription = description.value();
+        fallbackActive          = false;
     }
 }
 
@@ -335,7 +383,25 @@ void Network<Arch, Transformer>::load_internal() {
     {
         evalFile.current        = evalFile.defaultName;
         evalFile.netDescription = description.value();
+        fallbackActive          = false;
     }
+}
+
+
+template<typename Arch, typename Transformer>
+void Network<Arch, Transformer>::activate_fallback(const std::string& evalfilePath) {
+    fallbackActive = true;
+
+    const std::string& resolvedPath = evalfilePath.empty() ? evalFile.defaultName : evalfilePath;
+
+    evalFile.current        = resolvedPath;
+    evalFile.netDescription = "Fallback simple evaluation";
+
+    initialize();
+
+    std::memset(featureTransformer.get(), 0, sizeof(Transformer));
+    for (std::size_t i = 0; i < LayerStacks; ++i)
+        std::memset(&network[i], 0, sizeof(Arch));
 }
 
 
@@ -351,6 +417,9 @@ bool Network<Arch, Transformer>::save(std::ostream&      stream,
                                       const std::string& name,
                                       const std::string& netDescription) const {
     if (name.empty() || name == "None")
+        return false;
+
+    if (fallbackActive)
         return false;
 
     return write_parameters(stream, netDescription);
