@@ -500,6 +500,11 @@ bool Network<Arch, Transformer>::write_parameters(std::ostream&      stream,
     return bool(stream);
 }
 
+template<typename Arch, typename Transformer>
+bool Network<Arch, Transformer>::is_fallback_active() const {
+    return fallbackActive;
+}
+
 // Explicit template instantiations
 
 template class Network<NetworkArchitecture<TransformedFeatureDimensionsBig, L2Big, L3Big>,
