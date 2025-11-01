@@ -1,6 +1,6 @@
 /*
-  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
-  Copyright (C) 2004-2025 The Stockfish developers (see AUTHORS file)
+  SF-PG-041025, a Stockfish-based UCI chess engine with Polyglot (.bin) book support and ChatGPT-inspired ideas
+  Authors: Jorge Ruiz, Codex ChatGPT, and the Stockfish developers (see AUTHORS file)
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -77,12 +77,9 @@ class Network {
                                  AccumulatorStack&                       accumulatorStack,
                                  AccumulatorCaches::Cache<FTDimensions>* cache) const;
 
-    bool is_fallback_active() const;
-
    private:
     void load_user_net(const std::string&, const std::string&);
     void load_internal();
-    void activate_fallback(const std::string&);
 
     void initialize();
 
@@ -103,7 +100,6 @@ class Network {
 
     EvalFile         evalFile;
     EmbeddedNNUEType embeddedType;
-    bool             fallbackActive = false;
 
     // Hash value of evaluation function structure
     static constexpr std::uint32_t hash = Transformer::get_hash_value() ^ Arch::get_hash_value();
