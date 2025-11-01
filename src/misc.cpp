@@ -1,5 +1,5 @@
 /*
-  SF-PG-041025, a Stockfish-based UCI chess engine with Polyglot (.bin) book support and ChatGPT-inspired ideas
+  SF-PG-011125, a Stockfish-based UCI chess engine with Polyglot (.bin) book support and ChatGPT-inspired ideas
   Authors: Jorge Ruiz, Codex ChatGPT, and the Stockfish developers (see AUTHORS file)
 
   Stockfish is free software: you can redistribute it and/or modify
@@ -42,7 +42,7 @@ namespace {
 // Engine branding. We expose only the SF-PG identifier to both console headers
 // and the UCI "id name" field so that no upstream Stockfish development tag is
 // appended.
-constexpr std::string_view engine_name = "SF-PG-071025";
+constexpr std::string_view engine_name = "SF-PG-011125";
 
 // Our fancy logging facility. The trick here is to replace cin.rdbuf() and
 // cout.rdbuf() with two Tie objects that tie cin and cout to a file stream. We
@@ -115,9 +115,9 @@ class Logger {
 }  // namespace
 
 
-// Returns the display name of SF-PG-071025. The engine intentionally avoids
+// Returns the display name of SF-PG-011125. The engine intentionally avoids
 // appending the upstream Stockfish development tag so that the banner reads
-// exactly "SF-PG-071025".
+// exactly "SF-PG-011125".
 std::string engine_version_info() {
     return std::string(engine_name);
 }
@@ -125,8 +125,11 @@ std::string engine_version_info() {
 std::string engine_info(bool to_uci) {
     const std::string name = to_uci ? std::string(engine_name) : engine_version_info();
 
-    return name + (to_uci ? "\nid author " : " by ")
-         + "Jorge Ruiz, Codex ChatGPT, and the Stockfish developers (see AUTHORS file)";
+    const std::string compiled_by = "by Jorge Ruiz";
+    const std::string contributors =
+        "Codex ChatGPT and the Stockfish developers (see AUTHORS file)";
+
+    return name + (to_uci ? "\nid author " : " ") + compiled_by + " · " + contributors;
 }
 
 

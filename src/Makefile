@@ -1,4 +1,4 @@
-# SF-PG-071025, a Stockfish-based UCI chess engine with Polyglot (.bin) book support and ChatGPT-inspired ideas
+# SF-PG-011125, a Stockfish-based UCI chess engine with Polyglot (.bin) book support and ChatGPT-inspired ideas
 # Authors: Jorge Ruiz, Codex ChatGPT, and the Stockfish developers (see AUTHORS file)
 #
 # Stockfish is free software: you can redistribute it and/or modify
@@ -39,9 +39,9 @@ endif
 
 ### Executable name
 ifeq ($(target_windows),yes)
-        EXE = SF-PG-071025.exe
+        EXE = SF-PG-011125.exe
 else
-        EXE = SF-PG-071025
+        EXE = SF-PG-011125
 endif
 
 ### Installation dir definitions
@@ -886,7 +886,7 @@ endif
 
 help:
 	@echo "" && \
-	echo "To compile SF-PG-071025, type: " && \
+	echo "To compile SF-PG-011125, type: " && \
 	echo "" && \
 	echo "make -j target [ARCH=arch] [COMP=compiler] [COMPCXX=cxx]" && \
 	echo "" && \
@@ -1004,16 +1004,16 @@ clean: objclean profileclean
 
 # clean binaries and objects
 objclean:
-	@rm -f SF-PG-071025 SF-PG-071025.exe stockfish stockfish.exe *.o ./syzygy/*.o ./nnue/*.o ./nnue/features/*.o
+	@rm -f SF-PG-011125 SF-PG-011125.exe stockfish stockfish.exe *.o ./syzygy/*.o ./nnue/*.o ./nnue/features/*.o
 
 # clean auxiliary profiling files
 profileclean:
 	@rm -rf profdir
 	@rm -f bench.txt *.gcda *.gcno ./syzygy/*.gcda ./nnue/*.gcda ./nnue/features/*.gcda *.s PGOBENCH.out
-	@rm -f SF-PG-071025.profdata stockfish.profdata *.profraw
-	@rm -f SF-PG-071025.*args* stockfish.*args*
-	@rm -f SF-PG-071025.*lt* stockfish.*lt*
-	@rm -f SF-PG-071025.res stockfish.res
+	@rm -f SF-PG-011125.profdata stockfish.profdata *.profraw
+	@rm -f SF-PG-011125.*args* stockfish.*args*
+	@rm -f SF-PG-011125.*lt* stockfish.*lt*
+	@rm -f SF-PG-011125.res stockfish.res
 	@rm -f ./-lstdc++.res
 
 # evaluation network (nnue)
@@ -1113,9 +1113,9 @@ clang-profile-make:
 	all
 
 clang-profile-use:
-	$(XCRUN) $(LLVM_PROFDATA) merge -output=SF-PG-071025.profdata *.profraw
+	$(XCRUN) $(LLVM_PROFDATA) merge -output=SF-PG-011125.profdata *.profraw
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) \
-	EXTRACXXFLAGS='-fprofile-use=SF-PG-071025.profdata' \
+	EXTRACXXFLAGS='-fprofile-use=SF-PG-011125.profdata' \
 	EXTRALDFLAGS='-fprofile-use ' \
 	all
 
@@ -1141,9 +1141,9 @@ icx-profile-make:
 	all
 
 icx-profile-use:
-	$(XCRUN) $(LLVM_PROFDATA) merge -output=SF-PG-071025.profdata *.profraw
+	$(XCRUN) $(LLVM_PROFDATA) merge -output=SF-PG-011125.profdata *.profraw
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) \
-	EXTRACXXFLAGS='-fprofile-instr-use=SF-PG-071025.profdata' \
+	EXTRACXXFLAGS='-fprofile-instr-use=SF-PG-011125.profdata' \
 	EXTRALDFLAGS='-fprofile-use ' \
 	all
 

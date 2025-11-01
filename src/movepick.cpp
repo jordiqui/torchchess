@@ -1,5 +1,5 @@
 /*
-  SF-PG-041025, a Stockfish-based UCI chess engine with Polyglot (.bin) book support and ChatGPT-inspired ideas
+  SF-PG-011125, a Stockfish-based UCI chess engine with Polyglot (.bin) book support and ChatGPT-inspired ideas
   Authors: Jorge Ruiz, Codex ChatGPT, and the Stockfish developers (see AUTHORS file)
 
   Stockfish is free software: you can redistribute it and/or modify
