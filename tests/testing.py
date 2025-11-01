@@ -1,5 +1,5 @@
 import subprocess
-from typing import List
+from typing import List, Optional
 import os
 import collections
 import time
@@ -287,12 +287,12 @@ class Stockfish:
         self,
         prefix: List[str],
         path: str,
-        args: List[str] = [],
+        args: Optional[List[str]] = None,
         cli: bool = False,
     ):
         self.path = path
         self.process = None
-        self.args = args
+        self.args = list(args) if args is not None else []
         self.cli = cli
         self.prefix = prefix
         self.output = []
