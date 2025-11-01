@@ -1,13 +1,15 @@
 import argparse
-import re
-import sys
-import subprocess
-import pathlib
 import os
+import pathlib
+import re
+import struct
+import subprocess
+import sys
 
 from testing import (
     EPD,
     TSAN,
+    ENGINE_ID,
     Stockfish as Engine,
     MiniTestFramework,
     OrderedClassMembers,
@@ -214,7 +216,7 @@ class TestInteractive(metaclass=OrderedClassMembers):
         self.stockfish.clear_output()
 
     def test_startup_output(self):
-        self.stockfish.starts_with("Stockfish")
+        self.stockfish.starts_with(ENGINE_ID)
 
     def test_uci_command(self):
         self.stockfish.send_command("uci")
@@ -222,6 +224,25 @@ class TestInteractive(metaclass=OrderedClassMembers):
 
     def test_set_threads_option(self):
         self.stockfish.send_command(f"setoption name Threads value {get_threads()}")
+
+    def test_empty_polybook_is_ignored(self):
+        empty_book = os.path.join(os.getcwd(), "empty_polybook.bin")
+
+        if os.path.exists(empty_book):
+            os.remove(empty_book)
+
+        with open(empty_book, "wb"):
+            pass
+
+        self.stockfish.send_command(
+            f"setoption name Book1 File value {empty_book}"
+        )
+        self.stockfish.send_command("ucinewgame")
+        self.stockfish.send_command("position startpos")
+        self.stockfish.send_command("go depth 1")
+        self.stockfish.starts_with("bestmove")
+
+        os.remove(empty_book)
 
     def test_ucinewgame_and_startpos_nodes_1000(self):
         self.stockfish.send_command("ucinewgame")
@@ -404,6 +425,31 @@ class TestInteractive(metaclass=OrderedClassMembers):
         self.stockfish.send_command("go depth 5")
         self.stockfish.starts_with("bestmove")
 
+    def test_polybook_ignores_invalid_entry(self):
+        book_path = pathlib.Path("invalid_polybook.bin").resolve()
+        key = 0x463B96181691FC9C
+        invalid_move = 0x0324  # e2e5 (invalid in the initial position)
+        valid_move = 0x031C    # e2e4
+
+        with open(book_path, "wb") as book:
+            for move, weight in ((invalid_move, 1000), (valid_move, 1)):
+                book.write(struct.pack(">QHHI", key, move, weight, 0))
+
+        self.stockfish.send_command("uci")
+        self.stockfish.equals("uciok")
+
+        self.stockfish.setoption("Book1 File", str(book_path))
+        self.stockfish.setoption("Book1", "true")
+        self.stockfish.setoption("Book1 BestBookMove", "true")
+
+        self.stockfish.send_command("ucinewgame")
+        self.stockfish.send_command("position startpos")
+        self.stockfish.send_command("go depth 1")
+        self.stockfish.expect("bestmove e2e4*")
+
+        self.stockfish.setoption("Book1", "false")
+        self.stockfish.setoption("Book1 File", "")
+
     def test_fen_position_with_skill_level(self):
         self.stockfish.send_command("setoption name Skill Level value 10")
         self.stockfish.send_command("position startpos")
@@ -426,7 +472,7 @@ class TestSyzygy(metaclass=OrderedClassMembers):
         self.stockfish.clear_output()
 
     def test_syzygy_setup(self):
-        self.stockfish.starts_with("Stockfish")
+        self.stockfish.starts_with(ENGINE_ID)
         self.stockfish.send_command("uci")
         self.stockfish.send_command(
             f"setoption name SyzygyPath value {os.path.join(PATH, 'syzygy')}"
