@@ -1,6 +1,6 @@
 /*
-  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
-  Copyright (C) 2004-2025 The Stockfish developers (see AUTHORS file)
+  SF-PG-041025, a Stockfish-based UCI chess engine with Polyglot (.bin) book support and ChatGPT-inspired ideas
+  Authors: Jorge Ruiz, Codex ChatGPT, and the Stockfish developers (see AUTHORS file)
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -58,19 +58,14 @@ Value Eval::evaluate(const Eval::NNUE::Networks&    networks,
 
     assert(!pos.checkers());
 
-    const bool bigAvailable   = !networks.big.is_fallback_active();
-    const bool smallAvailable = !networks.small.is_fallback_active();
-
-    bool forceSmall = !bigAvailable && smallAvailable;
-    bool smallNet   = smallAvailable && (forceSmall || use_smallnet(pos));
-
+    bool smallNet           = use_smallnet(pos);
     auto [psqt, positional] = smallNet ? networks.small.evaluate(pos, accumulators, &caches.small)
                                        : networks.big.evaluate(pos, accumulators, &caches.big);
 
     Value nnue = (125 * psqt + 131 * positional) / 128;
 
     // Re-evaluate the position when higher eval accuracy is worth the time spent
-    if (smallNet && bigAvailable && (std::abs(nnue) < 236))
+    if (smallNet && (std::abs(nnue) < 236))
     {
         std::tie(psqt, positional) = networks.big.evaluate(pos, accumulators, &caches.big);
         nnue                       = (125 * psqt + 131 * positional) / 128;

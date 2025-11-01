@@ -1,6 +1,6 @@
 /*
-  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
-  Copyright (C) 2004-2025 The Stockfish developers (see AUTHORS file)
+  SF-PG-041025, a Stockfish-based UCI chess engine with Polyglot (.bin) book support and ChatGPT-inspired ideas
+  Authors: Jorge Ruiz, Codex ChatGPT, and the Stockfish developers (see AUTHORS file)
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -231,11 +231,9 @@ void UCIEngine::bench(std::istream& args) {
     std::string token;
     uint64_t    num, nodes = 0, cnt = 1;
     uint64_t    nodesSearched = 0;
-    const auto& options       = engine.get_options();
-
-    engine.set_on_update_full([&](const auto& i) {
+    engine.set_on_update_full([this, &nodesSearched](const auto& i) {
         nodesSearched = i.nodes;
-        on_update_full(i, options["UCI_ShowWDL"]);
+        on_update_full(i, engine.get_options()["UCI_ShowWDL"]);
     });
 
     std::vector<std::string> list = Benchmark::setup_bench(engine.fen(), args);
@@ -293,7 +291,9 @@ void UCIEngine::bench(std::istream& args) {
               << "\nNodes/second    : " << 1000 * nodes / elapsed << std::endl;
 
     // reset callback, to not capture a dangling reference to nodesSearched
-    engine.set_on_update_full([&](const auto& i) { on_update_full(i, options["UCI_ShowWDL"]); });
+    engine.set_on_update_full([this](const auto& i) {
+        on_update_full(i, engine.get_options()["UCI_ShowWDL"]);
+    });
 }
 
 void UCIEngine::benchmark(std::istream& args) {

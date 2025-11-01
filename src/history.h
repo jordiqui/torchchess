@@ -1,6 +1,6 @@
 /*
-  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
-  Copyright (C) 2004-2025 The Stockfish developers (see AUTHORS file)
+  SF-PG-041025, a Stockfish-based UCI chess engine with Polyglot (.bin) book support and ChatGPT-inspired ideas
+  Authors: Jorge Ruiz, Codex ChatGPT, and the Stockfish developers (see AUTHORS file)
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
 
 namespace Stockfish {
 
-constexpr int PAWN_HISTORY_SIZE        = 8192;   // has to be a power of 2
+constexpr int PAWN_HISTORY_SIZE        = 1024;   // has to be a power of 2
 constexpr int CORRECTION_HISTORY_SIZE  = 32768;  // has to be a power of 2
 constexpr int CORRECTION_HISTORY_LIMIT = 1024;
 constexpr int LOW_PLY_HISTORY_SIZE     = 5;

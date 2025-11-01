@@ -1,6 +1,6 @@
 /*
-  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
-  Copyright (C) 2004-2025 The Stockfish developers (see AUTHORS file)
+  SF-PG-041025, a Stockfish-based UCI chess engine with Polyglot (.bin) book support and ChatGPT-inspired ideas
+  Authors: Jorge Ruiz, Codex ChatGPT, and the Stockfish developers (see AUTHORS file)
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -28,7 +28,6 @@
 #include <mutex>
 #include <vector>
 
-#include "memory.h"
 #include "numa.h"
 #include "position.h"
 #include "search.h"
@@ -94,8 +93,8 @@ class Thread {
     void   wait_for_search_finished();
     size_t id() const { return idx; }
 
-    LargePagePtr<Search::Worker> worker;
-    std::function<void()>        jobFunc;
+    std::unique_ptr<Search::Worker> worker;
+    std::function<void()>           jobFunc;
 
    private:
     std::mutex                mutex;

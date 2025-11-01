@@ -1,6 +1,6 @@
 /*
-  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
-  Copyright (C) 2004-2025 The Stockfish developers (see AUTHORS file)
+  SF-PG-041025, a Stockfish-based UCI chess engine with Polyglot (.bin) book support and ChatGPT-inspired ideas
+  Authors: Jorge Ruiz, Codex ChatGPT, and the Stockfish developers (see AUTHORS file)
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -41,6 +41,7 @@
 #include "movepick.h"
 #include "nnue/network.h"
 #include "nnue/nnue_accumulator.h"
+#include "polybook.h"
 #include "position.h"
 #include "syzygy/tbprobe.h"
 #include "thread.h"
@@ -82,10 +83,10 @@ int correction_value(const Worker& w, const Position& pos, const Stack* const ss
     const auto  micv  = w.minorPieceCorrectionHistory[minor_piece_index(pos)][us];
     const auto  wnpcv = w.nonPawnCorrectionHistory[non_pawn_index<WHITE>(pos)][WHITE][us];
     const auto  bnpcv = w.nonPawnCorrectionHistory[non_pawn_index<BLACK>(pos)][BLACK][us];
-    const auto  cntcv =
-      m.is_ok() ? (*(ss - 2)->continuationCorrectionHistory)[pos.piece_on(m.to_sq())][m.to_sq()]
-                    + (*(ss - 4)->continuationCorrectionHistory)[pos.piece_on(m.to_sq())][m.to_sq()]
-                 : 8;
+    const auto  cntcv = m.is_ok()
+                         ? (*(ss - 2)->continuationCorrectionHistory)[pos.piece_on(m.to_sq())][m.to_sq()]
+                             + (*(ss - 4)->continuationCorrectionHistory)[pos.piece_on(m.to_sq())][m.to_sq()]
+                         : 8;
 
     return 9536 * pcv + 8494 * micv + 10132 * (wnpcv + bnpcv) + 7156 * cntcv;
 }
@@ -178,6 +179,8 @@ void Search::Worker::start_searching() {
                             main_manager()->originalTimeAdjust);
     tt.new_search();
 
+    Move bookMove = Move::none();
+
     if (rootMoves.empty())
     {
         rootMoves.emplace_back(Move::none());
@@ -186,8 +189,53 @@ void Search::Worker::start_searching() {
     }
     else
     {
-        threads.start_searching();  // start non-main threads
-        iterative_deepening();      // main thread start searching
+        if (!limits.infinite && !limits.mate)
+        {
+            const int currentMoveNumber = rootPos.game_ply() / 2;
+
+            if ((bool) options["Book1"] && currentMoveNumber < (int) options["Book1 Depth"])
+                bookMove = polybook[0].probe(rootPos, (bool) options["Book1 BestBookMove"],
+                                             (int) options["Book1 Width"]);
+
+            if (bookMove == Move::none() && (bool) options["Book2"]
+                && currentMoveNumber < (int) options["Book2 Depth"])
+                bookMove = polybook[1].probe(rootPos, (bool) options["Book2 BestBookMove"],
+                                             (int) options["Book2 Width"]);
+
+            if (bookMove == Move::none() && (bool) options["Book3"]
+                && currentMoveNumber < (int) options["Book3 Depth"])
+                bookMove = polybook[2].probe(rootPos, (bool) options["Book3 BestBookMove"],
+                                             (int) options["Book3 Width"]);
+
+            if (bookMove == Move::none() && (bool) options["Book4"]
+                && currentMoveNumber < (int) options["Book4 Depth"])
+                bookMove = polybook[3].probe(rootPos, (bool) options["Book4 BestBookMove"],
+                                             (int) options["Book4 Width"]);
+
+            if (bookMove == Move::none() && (bool) options["Book5"]
+                && currentMoveNumber < (int) options["Book5 Depth"])
+                bookMove = polybook[4].probe(rootPos, (bool) options["Book5 BestBookMove"],
+                                             (int) options["Book5 Width"]);
+
+            if (bookMove == Move::none() && (bool) options["Book6"]
+                && currentMoveNumber < (int) options["Book6 Depth"])
+                bookMove = polybook[5].probe(rootPos, (bool) options["Book6 BestBookMove"],
+                                             (int) options["Book6 Width"]);
+        }
+
+        if (bookMove != Move::none()
+            && std::find(rootMoves.begin(), rootMoves.end(), bookMove) != rootMoves.end())
+        {
+            for (auto&& th : threads)
+                std::swap(th->worker.get()->rootMoves[0],
+                          *std::find(th->worker.get()->rootMoves.begin(),
+                                     th->worker.get()->rootMoves.end(), bookMove));
+        }
+        else
+        {
+            threads.start_searching();  // start non-main threads
+            iterative_deepening();      // main thread start searching
+        }
     }
 
     // When we reach the maximum depth, we can arrive here without a raise of
@@ -386,8 +434,7 @@ void Search::Worker::iterative_deepening() {
                 }
                 else if (bestValue >= beta)
                 {
-                    alpha = std::max(beta - delta, alpha);
-                    beta  = std::min(bestValue + delta, VALUE_INFINITE);
+                    beta = std::min(bestValue + delta, VALUE_INFINITE);
                     ++failedHighCnt;
                 }
                 else
@@ -590,7 +637,10 @@ Value Search::Worker::search(
 
     // Dive into quiescence search when the depth reaches zero
     if (depth <= 0)
-        return qsearch<PvNode ? PV : NonPV>(pos, ss, alpha, beta);
+    {
+        constexpr auto nt = PvNode ? PV : NonPV;
+        return qsearch<nt>(pos, ss, alpha, beta);
+    }
 
     // Limit the depth if extensions made it too large
     depth = std::min(depth, MAX_PLY - 1);
@@ -1451,11 +1501,9 @@ moves_loop:  // When in check, search starts here
         && ((bestValue < ss->staticEval && bestValue < beta)  // negative correction & no fail high
             || (bestValue > ss->staticEval && bestMove)))     // positive correction & no fail low
     {
-        auto bonus =
-          std::clamp(int(bestValue - ss->staticEval) * depth / (8 + (bestValue > ss->staticEval)),
-                     -CORRECTION_HISTORY_LIMIT / 4, CORRECTION_HISTORY_LIMIT / 4);
-        update_correction_history(pos, ss, *this,
-                                  (1088 - 180 * (bestValue > ss->staticEval)) * bonus / 1024);
+        auto bonus = std::clamp(int(bestValue - ss->staticEval) * depth / 8,
+                                -CORRECTION_HISTORY_LIMIT / 4, CORRECTION_HISTORY_LIMIT / 4);
+        update_correction_history(pos, ss, *this, bonus);
     }
 
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
@@ -1634,8 +1682,9 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
                 }
             }
 
-            // Skip non-captures
-            if (!capture)
+            // Continuation history based pruning
+            if (!capture
+                && pawnHistory[pawn_history_index(pos)][pos.moved_piece(move)][move.to_sq()] < 7300)
                 continue;
 
             // Do not search moves with bad enough SEE values

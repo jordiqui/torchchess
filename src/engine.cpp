@@ -1,6 +1,6 @@
 /*
-  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
-  Copyright (C) 2004-2025 The Stockfish developers (see AUTHORS file)
+  SF-PG-041025, a Stockfish-based UCI chess engine with Polyglot (.bin) book support and ChatGPT-inspired ideas
+  Authors: Jorge Ruiz, Codex ChatGPT, and the Stockfish developers (see AUTHORS file)
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -35,6 +35,7 @@
 #include "nnue/nnue_common.h"
 #include "numa.h"
 #include "perft.h"
+#include "polybook.h"
 #include "position.h"
 #include "search.h"
 #include "syzygy/tbprobe.h"
@@ -127,6 +128,60 @@ Engine::Engine(std::optional<std::string> path) :
     options.add("Syzygy50MoveRule", Option(true));
 
     options.add("SyzygyProbeLimit", Option(7, 0, 7));
+
+    options.add("Book1", Option(false));
+    options.add("Book1 File", Option("", [](const Option& o) {
+                    polybook[0].init(o);
+                    return std::nullopt;
+                }));
+    options.add("Book1 BestBookMove", Option(false));
+    options.add("Book1 Depth", Option(255, 1, 350));
+    options.add("Book1 Width", Option(1, 1, 10));
+
+    options.add("Book2", Option(false));
+    options.add("Book2 File", Option("", [](const Option& o) {
+                    polybook[1].init(o);
+                    return std::nullopt;
+                }));
+    options.add("Book2 BestBookMove", Option(false));
+    options.add("Book2 Depth", Option(255, 1, 350));
+    options.add("Book2 Width", Option(1, 1, 10));
+
+    options.add("Book3", Option(false));
+    options.add("Book3 File", Option("", [](const Option& o) {
+                    polybook[2].init(o);
+                    return std::nullopt;
+                }));
+    options.add("Book3 BestBookMove", Option(false));
+    options.add("Book3 Depth", Option(255, 1, 350));
+    options.add("Book3 Width", Option(1, 1, 10));
+
+    options.add("Book4", Option(false));
+    options.add("Book4 File", Option("", [](const Option& o) {
+                    polybook[3].init(o);
+                    return std::nullopt;
+                }));
+    options.add("Book4 BestBookMove", Option(false));
+    options.add("Book4 Depth", Option(255, 1, 350));
+    options.add("Book4 Width", Option(1, 1, 10));
+
+    options.add("Book5", Option(false));
+    options.add("Book5 File", Option("", [](const Option& o) {
+                    polybook[4].init(o);
+                    return std::nullopt;
+                }));
+    options.add("Book5 BestBookMove", Option(false));
+    options.add("Book5 Depth", Option(255, 1, 350));
+    options.add("Book5 Width", Option(1, 1, 10));
+
+    options.add("Book6", Option(false));
+    options.add("Book6 File", Option("", [](const Option& o) {
+                    polybook[5].init(o);
+                    return std::nullopt;
+                }));
+    options.add("Book6 BestBookMove", Option(false));
+    options.add("Book6 Depth", Option(255, 1, 350));
+    options.add("Book6 Width", Option(1, 1, 10));
 
     options.add(  //
       "EvalFile", Option(EvalFileDefaultNameBig, [this](const Option& o) {
@@ -254,26 +309,6 @@ void Engine::set_ponderhit(bool b) { threads.main_manager()->ponder = b; }
 void Engine::verify_networks() const {
     networks->big.verify(options["EvalFile"], onVerifyNetworks);
     networks->small.verify(options["EvalFileSmall"], onVerifyNetworks);
-
-    if (onVerifyNetworks)
-    {
-        const bool bigFallback   = networks->big.is_fallback_active();
-        const bool smallFallback = networks->small.is_fallback_active();
-
-        if (bigFallback && !smallFallback)
-        {
-            onVerifyNetworks("The primary NNUE network '" + std::string(options["EvalFile"]) +
-                             "' is unavailable; falling back to '"
-                             + std::string(options["EvalFileSmall"]) +
-                             "'. Run scripts/net.sh to download the recommended network.");
-        }
-        else if (bigFallback && smallFallback)
-        {
-            onVerifyNetworks("No NNUE networks could be loaded. The engine will use the simplified "
-                             "material evaluation. Run scripts/net.sh to download '"
-                             + std::string(options["EvalFile"]) + "' or provide valid EvalFile/EvalFileSmall paths.");
-        }
-    }
 }
 
 void Engine::load_networks() {
